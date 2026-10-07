@@ -22,7 +22,7 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from electra_system1 import ElectraSystem1, collate_batch
-from metrics import brier, ece, read_jsonl, resolve_device
+from metrics import brier, ece, get_splits, read_jsonl, resolve_device
 from pusk_data import get_icd_labels
 
 
@@ -130,8 +130,15 @@ def evaluate_condition(
 
 
 def main():
+    import argparse
+    parser = argparse.ArgumentParser(description="Ablation study on ELECTRA-Small")
+    parser.add_argument("--csv", default="data/dummy_pusk.csv")
+    parser.add_argument("--data-dir", default="data/splits")
+    parser.add_argument("--model-dir", default="runs/electra")
+    args = parser.parse_args()
+
     device = resolve_device("auto")
-    model_dir = Path("runs/electra")
+    model_dir = Path(args.model_dir)
     print(f"Loading ELECTRA model from {model_dir} on {device}...")
     tok = AutoTokenizer.from_pretrained(model_dir / "tokenizer")
     criteria = get_icd_labels("id")
@@ -142,7 +149,7 @@ def main():
     model.load_state_dict(torch.load(model_dir / "best_model.pt", map_location=device))
     model.eval()
 
-    test_rows = read_jsonl(Path("runs/xxx-holdout-id/data/test.jsonl"))
+    _, _, _, test_rows = get_splits(csv_path=args.csv, splits_dir=args.data_dir)
     print(f"Evaluating {len(test_rows)} encounters across 3 ablation conditions...")
 
     results = {}

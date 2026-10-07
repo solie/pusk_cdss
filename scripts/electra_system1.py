@@ -21,7 +21,7 @@ from sklearn.metrics import f1_score
 from transformers import AutoConfig, AutoModel, AutoTokenizer, get_cosine_schedule_with_warmup
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from pusk_data import get_icd_labels
-from metrics import brier, ece, fit_temperature, read_jsonl, resolve_device, softmax
+from metrics import brier, ece, fit_temperature, get_splits, read_jsonl, resolve_device, softmax
 
 
 class ElectraSystem1(nn.Module):
@@ -181,6 +181,8 @@ def train_electra(
     label_smoothing: float = 0.10,
     output_dir: str = "runs/electra",
     resume: bool = False,
+    csv_path: str = "data/dummy_pusk.csv",
+    data_dir: str = "data/splits",
 ):
     out_path = Path(output_dir)
     out_path.mkdir(parents=True, exist_ok=True)
@@ -212,10 +214,7 @@ def train_electra(
     n_params = sum(p.numel() for p in model.parameters())
     print(f"Model parameters: {n_params:,} ({n_params/1e6:.1f}M)")
     # Load datasets
-    train_rows = read_jsonl(Path("runs/xxx-holdout-id/data/train.jsonl"))
-    dev_rows = read_jsonl(Path("runs/xxx-holdout-id/data/development.jsonl"))
-    cal_rows = read_jsonl(Path("runs/xxx-holdout-id/data/calibration.jsonl"))
-    test_rows = read_jsonl(Path("runs/xxx-holdout-id/data/test.jsonl"))
+    train_rows, dev_rows, cal_rows, test_rows = get_splits(csv_path=csv_path, splits_dir=data_dir)
     print(f"Datasets: train={len(train_rows)}, dev={len(dev_rows)}, cal={len(cal_rows)}, test={len(test_rows)}")
 
     # Pre-encode training data for maximum speed
@@ -344,9 +343,12 @@ if __name__ == "__main__":
     parser.add_argument("--resume", action="store_true")
     parser.add_argument("--epochs", type=int, default=4)
     parser.add_argument("--lr", type=float, default=1.5e-4)
+    parser.add_argument("--csv", default="data/dummy_pusk.csv")
+    parser.add_argument("--data-dir", default="data/splits")
+    parser.add_argument("--output-dir", default="runs/electra")
     args = parser.parse_args()
     if args.eval_only:
-        out_path = Path("runs/electra")
+        out_path = Path(args.output_dir)
         device = resolve_device("auto")
         tok = AutoTokenizer.from_pretrained(out_path / "tokenizer")
         criteria = get_icd_labels("id")
@@ -355,8 +357,7 @@ if __name__ == "__main__":
         model.encoder.resize_token_embeddings(len(tok))
         model.load_state_dict(torch.load(out_path / "best_model.pt", map_location=device))
         n_params = sum(p.numel() for p in model.parameters())
-        cal_rows = read_jsonl(Path("runs/xxx-holdout-id/data/calibration.jsonl"))
-        test_rows = read_jsonl(Path("runs/xxx-holdout-id/data/test.jsonl"))
+        _, _, cal_rows, test_rows = get_splits(csv_path=args.csv, splits_dir=args.data_dir)
         print("Calibrating on calibration set (3,381 visits)...")
         _, cal_probs, cal_answers, _ = evaluate_model(model, tok, cal_rows, criteria, code_list, device, tag="cal")
         cal_logits = [np.log(np.maximum(p, 1e-12)) for p in cal_probs]
@@ -385,4 +386,7 @@ if __name__ == "__main__":
         print(f"  Mean Latency:   {cal_metrics['ms_per_encounter']:.1f} ms / encounter")
         print(f"\nSaved metrics to {results_file}")
     else:
-        train_electra(epochs=args.epochs, lr=args.lr, resume=args.resume)
+        train_electra(
+            epochs=args.epochs, lr=args.lr, resume=args.resume,
+            csv_path=args.csv, data_dir=args.data_dir, output_dir=args.output_dir
+        )
