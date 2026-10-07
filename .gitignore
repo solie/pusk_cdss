@@ -1,0 +1,28 @@
+# OS & Editor
+.DS_Store
+Thumbs.db
+*.swp
+*~
+.idea/
+.vscode/
+
+# Python & Environment
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+env/
+venv/
+
+# Large training checkpoints (keep ONNX demo weights)
+*.pt
+*.bin
+*.safetensors
+*.joblib
+*.tgz
+*.tar.gz
+*.zip
+
+# Intermediate run directories
+runs/
+.cache/

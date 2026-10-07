@@ -1,0 +1,888 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Puskesmas Poncol CDSS — Rapid System-1 Diagnostic Triage</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="ort.min.js"></script>
+  <style>
+    body { font-family: 'Plus Jakarta Sans', sans-serif; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+    .custom-scrollbar::-webkit-scrollbar { width: 6px; height: 6px; }
+    .custom-scrollbar::-webkit-scrollbar-track { background: #f1f5f9; }
+    .custom-scrollbar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col">
+
+  <!-- Top Navigation Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-teal-600 flex items-center justify-center text-white shadow-md shadow-teal-500/20 font-bold text-lg">
+          <i data-lucide="stethoscope" class="w-6 h-6"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2">
+            <h1 class="text-base font-bold text-slate-900 tracking-tight">Puskesmas Poncol CDSS</h1>
+            <span id="engine-badge" class="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-emerald-100 text-emerald-800">
+              ELECTRA-Small 13.5M (INT8 WASM)
+            </span>
+          </div>
+          <p data-i18n="header_subtitle" class="text-xs text-slate-500">
+            Sistem Pendukung Keputusan Medis Cepat: Non-Autoregressive SLM (100% Client-Side WebAssembly)
+          </p>
+        </div>
+      </div>
+      
+      <div class="flex items-center space-x-3 text-xs font-medium text-slate-600">
+        <!-- Latency / Engine Status -->
+        <div class="hidden sm:flex items-center space-x-2">
+          <div class="flex items-center space-x-1.5 bg-slate-100 px-2.5 py-1.5 rounded-lg border border-slate-200">
+            <span id="engine-dot" class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+            <span id="engine-status-text">Memuat Engine (~13 MB)...</span>
+          </div>
+          <div class="flex items-center space-x-1.5 bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-200 text-emerald-900">
+            <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+            <span>Latency: <strong id="header-latency" class="text-emerald-950 font-mono">-- ms</strong></span>
+          </div>
+        </div>
+
+        <!-- Language Switcher (EN / ID) -->
+        <div class="flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200">
+          <button type="button" id="lang-btn-id" onclick="setLanguage('id')"
+            class="px-2.5 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-teal-800">
+            ID
+          </button>
+          <button type="button" id="lang-btn-en" onclick="setLanguage('en')"
+            class="px-2.5 py-1 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-800">
+            EN
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Clinical Vignettes Bar -->
+  <section class="bg-slate-100/70 border-b border-slate-200 py-2.5">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center space-x-2 overflow-x-auto custom-scrollbar pb-1 text-xs">
+        <span class="font-semibold text-slate-500 uppercase tracking-wider shrink-0 flex items-center mr-1">
+          <i data-lucide="sparkles" class="w-3.5 h-3.5 mr-1 text-amber-500"></i>
+          <span data-i18n="vignettes_label">Contoh Kasus:</span>
+        </span>
+        <div id="presets-container" class="flex space-x-2 shrink-0">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Main Work Area -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+
+      <!-- LEFT COLUMN: Patient Clinical Input (4 cols) -->
+      <section class="lg:col-span-4 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+        <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-gradient-to-r from-slate-50 to-white">
+          <div class="flex items-center space-x-2">
+            <i data-lucide="user" class="w-4 h-4 text-teal-600"></i>
+            <h2 data-i18n="encounter_title" class="font-bold text-slate-800 text-sm">Data Kunjungan Pasien</h2>
+          </div>
+          <span data-i18n="encounter_tag" class="text-[11px] text-slate-400">Rekam Medis Primer</span>
+        </div>
+
+        <form id="encounter-form" class="p-4 space-y-3.5">
+          <!-- Anamnesa (Chief Complaint) - Strictly for Anamnesa text -->
+          <div>
+            <div class="flex justify-between items-baseline mb-1">
+              <label for="anamnesa" data-i18n="anamnesa_label" class="block text-xs font-semibold text-slate-700">
+                Keluhan Utama (Anamnesa)
+              </label>
+              <span data-i18n="anamnesa_lang_hint" class="text-[10px] text-slate-400">Bahasa Indonesia / Jawa</span>
+            </div>
+            <textarea id="anamnesa" rows="4" required
+              data-i18n-placeholder="anamnesa_placeholder"
+              placeholder="Contoh: batuk mulai tadi malam, dahak sedikit hijau, pilek 3 hari, badan gregesi, tenggorokan nyeri (+)"
+              class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-2 focus:ring-teal-500 focus:border-teal-500 outline-none transition placeholder:text-slate-400 leading-relaxed"></textarea>
+          </div>
+
+          <!-- Dedicated Vitals & Demographic Input Boxes -->
+          <div>
+            <span data-i18n="vitals_header" class="block text-[11px] font-bold text-slate-700 uppercase tracking-wider mb-2">
+              Tanda Vital & Demografi
+            </span>
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+              <div>
+                <label for="sistole" data-i18n="sistole_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Sistole (mmHg)</label>
+                <input type="number" id="sistole" value="120" min="40" max="280" required
+                  class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+              </div>
+              <div>
+                <label for="diastole" data-i18n="diastole_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Diastole (mmHg)</label>
+                <input type="number" id="diastole" value="80" min="20" max="180" required
+                  class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+              </div>
+              <div>
+                <label for="age" data-i18n="age_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Usia (Tahun)</label>
+                <input type="number" id="age" value="35" min="0" max="110" step="0.5" required
+                  class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+              </div>
+              <div>
+                <label for="jkl" data-i18n="sex_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Jenis Kelamin</label>
+                <select id="jkl" class="w-full text-xs px-2 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none bg-white">
+                  <option value="Perempuan" data-i18n="female">Perempuan</option>
+                  <option value="Laki-laki" data-i18n="male">Laki-laki</option>
+                </select>
+              </div>
+              <div>
+                <label for="bb" data-i18n="weight_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Berat Badan (kg)</label>
+                <input type="number" id="bb" value="58" min="2" max="250" step="0.5" required
+                  class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+              </div>
+              <div>
+                <label for="tb" data-i18n="height_label" class="block text-[10px] font-medium text-slate-600 mb-0.5">Tinggi Badan (cm)</label>
+                <input type="number" id="tb" value="160" min="40" max="220" step="0.5" required
+                  class="w-full text-xs px-2.5 py-1.5 rounded-lg border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+              </div>
+            </div>
+          </div>
+
+          <!-- Submit Button -->
+          <button type="submit" id="btn-submit" disabled
+            class="w-full py-2.5 px-4 rounded-xl bg-teal-600 hover:bg-teal-700 disabled:bg-slate-300 text-white font-semibold text-xs shadow-md shadow-teal-600/20 transition flex items-center justify-center space-x-2 mt-4">
+            <i data-lucide="play" class="w-3.5 h-3.5 fill-white"></i>
+            <span data-i18n="run_diagnosis_btn">Jalankan Diagnosis Banding</span>
+          </button>
+        </form>
+      </section>
+
+      <!-- RIGHT COLUMN: 3-Card Model Comparison & Doctor Judge (8 cols) -->
+      <section class="lg:col-span-8 space-y-5">
+
+        <!-- Top Header for Models -->
+        <div class="flex items-center justify-between">
+          <h2 class="text-sm font-bold text-slate-800 flex items-center space-x-2">
+            <i data-lucide="git-compare" class="w-4 h-4 text-teal-600"></i>
+            <span data-i18n="comparison_header">Rekomendasi Diagnosis Diferensial ICD-10 (Top-1, Top-2, Top-3)</span>
+          </h2>
+          <span data-i18n="select_hint" class="text-[11px] text-slate-500 italic">Klik kartu untuk memilih diagnosis</span>
+        </div>
+
+        <!-- 3-Card Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-3.5 items-start">
+
+          <!-- CARD 1: Top-1 Primary Diagnosis -->
+          <div id="card-top1-box" class="bg-white rounded-2xl border-2 border-emerald-300 shadow-sm p-4 flex flex-col justify-between transition hover:shadow-md">
+            <div>
+              <div class="flex items-start justify-between pb-2.5 border-b border-slate-100">
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span>
+                    <h3 data-i18n="top1_card_title" class="font-bold text-slate-900 text-xs">Diagnosis Utama (Top-1)</h3>
+                  </div>
+                  <p data-i18n="top1_card_sub" class="text-[10px] text-slate-500 mt-0.5">Probabilitas Tertinggi Terkalibrasi</p>
+                </div>
+                <span id="top1-prob-badge" class="text-xs font-mono font-bold px-2 py-0.5 bg-emerald-100 text-emerald-800 rounded-lg">
+                  -- %
+                </span>
+              </div>
+
+              <!-- Confidence Triage Box -->
+              <div id="top1-triage-box" class="my-3 p-2.5 rounded-xl bg-slate-50 border border-slate-200 text-center">
+                <span id="top1-triage-text" data-i18n="awaiting_analysis" class="text-[11px] font-bold text-slate-500">
+                  Menunggu Analisis
+                </span>
+              </div>
+
+              <!-- Detail Content -->
+              <div id="top1-content" class="space-y-2 py-2">
+                <div data-i18n="awaiting_click" class="text-xs text-slate-400 py-6 text-center italic">
+                  Pilih contoh kasus atau klik 'Jalankan Diagnosis'.
+                </div>
+              </div>
+            </div>
+            
+            <div class="mt-3 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+              <span data-i18n="rank_1_badge">Pilihan Utama</span>
+              <button type="button" id="btn-select-top1" onclick="selectCardCode(1)" class="text-emerald-700 hover:underline font-semibold hidden">
+                Pilih Ini &rarr;
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD 2: Top-2 Differential Alternative -->
+          <div id="card-top2-box" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col justify-between transition hover:shadow-md">
+            <div>
+              <div class="flex items-start justify-between pb-2.5 border-b border-slate-100">
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-blue-500"></span>
+                    <h3 data-i18n="top2_card_title" class="font-bold text-slate-900 text-xs">Diferensial 2 (Top-2)</h3>
+                  </div>
+                  <p data-i18n="top2_card_sub" class="text-[10px] text-slate-500 mt-0.5">Opsi Banding Sekunder</p>
+                </div>
+                <span id="top2-prob-badge" class="text-xs font-mono font-bold px-2 py-0.5 bg-blue-100 text-blue-800 rounded-lg">
+                  -- %
+                </span>
+              </div>
+
+              <div class="my-3 p-2.5 rounded-xl bg-blue-50/60 border border-blue-100 text-center">
+                <span data-i18n="diff2_hint" class="text-[11px] font-semibold text-blue-800">Pertimbangkan Jika Gejala Berbeda</span>
+              </div>
+
+              <div id="top2-content" class="space-y-2 py-2">
+                <div data-i18n="awaiting_click" class="text-xs text-slate-400 py-6 text-center italic">
+                  Pilih contoh kasus atau klik 'Jalankan Diagnosis'.
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+              <span data-i18n="rank_2_badge">Diferensial 2</span>
+              <button type="button" id="btn-select-top2" onclick="selectCardCode(2)" class="text-blue-700 hover:underline font-semibold hidden">
+                Pilih Ini &rarr;
+              </button>
+            </div>
+          </div>
+
+          <!-- CARD 3: Top-3 Differential Alternative -->
+          <div id="card-top3-box" class="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 flex flex-col justify-between transition hover:shadow-md">
+            <div>
+              <div class="flex items-start justify-between pb-2.5 border-b border-slate-100">
+                <div>
+                  <div class="flex items-center space-x-1.5">
+                    <span class="w-2.5 h-2.5 rounded-full bg-purple-500"></span>
+                    <h3 data-i18n="top3_card_title" class="font-bold text-slate-900 text-xs">Diferensial 3 (Top-3)</h3>
+                  </div>
+                  <p data-i18n="top3_card_sub" class="text-[10px] text-slate-500 mt-0.5">Opsi Banding Tersier</p>
+                </div>
+                <span id="top3-prob-badge" class="text-xs font-mono font-bold px-2 py-0.5 bg-purple-100 text-purple-800 rounded-lg">
+                  -- %
+                </span>
+              </div>
+
+              <div class="my-3 p-2.5 rounded-xl bg-purple-50/60 border border-purple-100 text-center">
+                <span data-i18n="diff3_hint" class="text-[11px] font-semibold text-purple-800">Jendela Diferensial (90.7%)</span>
+              </div>
+
+              <div id="top3-content" class="space-y-2 py-2">
+                <div data-i18n="awaiting_click" class="text-xs text-slate-400 py-6 text-center italic">
+                  Pilih contoh kasus atau klik 'Jalankan Diagnosis'.
+                </div>
+              </div>
+            </div>
+
+            <div class="mt-3 pt-2.5 border-t border-slate-100 text-[10px] text-slate-400 flex items-center justify-between">
+              <span data-i18n="rank_3_badge">Diferensial 3</span>
+              <button type="button" id="btn-select-top3" onclick="selectCardCode(3)" class="text-purple-700 hover:underline font-semibold hidden">
+                Pilih Ini &rarr;
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Attending Physician Final Judgment Panel -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+          <div class="flex items-center justify-between pb-3 border-b border-slate-100">
+            <div>
+              <h3 data-i18n="doctor_panel_title" class="font-bold text-slate-900 text-sm flex items-center space-x-2">
+                <i data-lucide="shield-check" class="w-4 h-4 text-teal-600"></i>
+                <span>Keputusan Akhir Dokter (Human-in-the-Loop)</span>
+              </h3>
+              <p data-i18n="doctor_panel_subtitle" class="text-xs text-slate-500 mt-0.5">
+                Konfirmasi diagnosis resmi untuk dicatat pada Rekam Medis Elektronik (RME)
+              </p>
+            </div>
+            <span data-i18n="doctor_panel_badge" class="text-[11px] px-2.5 py-1 bg-teal-50 text-teal-800 rounded-lg font-semibold border border-teal-200">
+              Otoritas Klinis Penuh
+            </span>
+          </div>
+
+          <div class="grid grid-cols-1 md:grid-cols-12 gap-3.5 mt-4 items-end">
+            <div class="md:col-span-4">
+              <label for="chosen-code" data-i18n="selected_code_label" class="block text-xs font-semibold text-slate-700 mb-1">
+                Kode Diagnosis Terpilih (ICD-10)
+              </label>
+              <input type="text" id="chosen-code"
+                data-i18n-placeholder="selected_code_placeholder"
+                placeholder="Pilih dari kartu di atas atau ketik kode"
+                class="w-full text-xs font-bold font-mono px-3 py-2 rounded-xl border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none uppercase bg-slate-50">
+            </div>
+            <div class="md:col-span-5">
+              <label for="doctor-notes" data-i18n="notes_label" class="block text-xs font-semibold text-slate-700 mb-1">
+                Catatan Dokter (Opsional)
+              </label>
+              <input type="text" id="doctor-notes"
+                data-i18n-placeholder="notes_placeholder"
+                placeholder="Contoh: Terkonfirmasi infeksi saluran napas akut"
+                class="w-full text-xs px-3 py-2 rounded-xl border border-slate-300 focus:ring-teal-500 focus:border-teal-500 outline-none">
+            </div>
+            <div class="md:col-span-3">
+              <button type="button" id="btn-confirm-verdict" onclick="confirmVerdict()"
+                class="w-full py-2 px-3 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs shadow-sm transition flex items-center justify-center space-x-1.5">
+                <i data-lucide="check" class="w-3.5 h-3.5"></i>
+                <span data-i18n="confirm_verdict_btn">Konfirmasi RME</span>
+              </button>
+            </div>
+          </div>
+
+          <div id="alert-verdict-saved" class="hidden mt-3 p-2.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs flex items-center space-x-2">
+            <i data-lucide="check-circle" class="w-4 h-4 text-emerald-600"></i>
+            <span data-i18n="alert_recorded">Keputusan diagnosis dokter berhasil dicatat!</span>
+          </div>
+        </div>
+
+      </section>
+
+    </div>
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 text-center text-xs text-slate-400">
+      <p data-i18n="footer_text">
+        Puskesmas Poncol CDSS &bull; Model ELECTRA-Small 13.5M INT8 ONNX (Zero-Server WebAssembly) &bull; Semarang, Indonesia
+      </p>
+    </div>
+  </footer>
+
+  <!-- Client-Side Engine Script -->
+  <script>
+    // -------------------------------------------------------------------------
+    // WordPiece Tokenizer with Domain AddedTokens Pre-Splitting
+    // -------------------------------------------------------------------------
+    const CLINICAL_TOKENS = [
+      "anyeng-anyengan", "cekot-cekot", "parasetamol", "sumer-sumer", "tenggorokan",
+      "amoksilin", "belakang", "berdahak", "berdarah", "kencing", "menelan",
+      "muntah", "nggregesi", "panas", "pegal-pegal", "perut", "pusing", "sakit",
+      "tensi", "terasa", "alergi", "badan", "batuk", "bawah", "bengkak", "cair",
+      "cekot", "dahak", "demam", "diare", "gatal", "gatel", "geraham", "gigi",
+      "gregesi", "gusi", "haid", "hamil", "hidung", "kb", "keluhan", "kembung",
+      "kepala", "kiri", "kontrol", "kulit", "luka", "maag", "makan", "mata",
+      "merah", "mual", "mual-mual", "mules", "nggliyeng", "ngilu", "nyeri",
+      "obat", "pasien", "pegal", "perih", "pilek", "pinggang", "posyandu",
+      "puskesmas", "pusing-pusing", "rahim", "rujuk", "rujukan", "saluran",
+      "sembelit", "sempoyongan", "sesak", "suami", "susah", "tekanan", "telinga",
+      "tenggorok", "teratur", "tersumbat", "tidur", "tinggi", "tulang", "ulu",
+      "urine", "vaksin", "vct", "arv", "bab", "bak", "bb", "bpjs", "tb", "tgl",
+      "thn", "px", "ispa", "lab", "kb-", "kb+"
+    ];
+    CLINICAL_TOKENS.sort((a, b) => b.length - a.length);
+    const addedRegex = new RegExp('(' + CLINICAL_TOKENS.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|') + ')', 'gi');
+
+    class WordPieceTokenizer {
+      constructor(vocab) {
+        this.vocab = vocab;
+        this.unkId = vocab['[UNK]'] ?? 100;
+        this.clsId = vocab['[CLS]'] ?? 101;
+        this.sepId = vocab['[SEP]'] ?? 102;
+        this.maskId = vocab['[MASK]'] ?? 103;
+        this.padId = vocab['[PAD]'] ?? 0;
+      }
+      tokenizePiece(word) {
+        if (!word) return [];
+        if (this.vocab[word] !== undefined) return [this.vocab[word]];
+        let isBad = false, start = 0;
+        const subTokens = [];
+        while (start < word.length) {
+          let end = word.length, curSub = null;
+          while (start < end) {
+            let sub = word.slice(start, end);
+            if (start > 0) sub = '##' + sub;
+            if (this.vocab[sub] !== undefined) { curSub = this.vocab[sub]; break; }
+            end--;
+          }
+          if (curSub === null) { isBad = true; break; }
+          subTokens.push(curSub);
+          start = end;
+        }
+        return isBad ? [this.unkId] : subTokens;
+      }
+      tokenize(text) {
+        const tokens = [];
+        const rawWords = text.toLowerCase()
+          .replace(/([.,!?:;()\"\'\/\-\+])/g, ' $1 ')
+          .trim()
+          .split(/\s+/);
+        for (const w of rawWords) {
+          if (!w) continue;
+          const parts = w.split(addedRegex).filter(Boolean);
+          for (const p of parts) {
+            tokens.push(...this.tokenizePiece(p));
+          }
+        }
+        return tokens;
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Multilingual Dictionary & Presets
+    // -------------------------------------------------------------------------
+    let currentLang = 'id';
+    let ortSession = null;
+    let tokenizer = null;
+    let criteria = null;
+    let currentTop3 = [];
+
+    const PRESETS = [
+      {
+        id: "p1",
+        title_id: "ISPA / Batuk Pilek (J06/J00)",
+        title_en: "Acute URI / Cold (J06/J00)",
+        anamnesa: "demam tinggi sejak kemarin, batuk berdahak, pilek, badan gregesi, tenggorokan sakit menelan",
+        age: 27, jkl: "Laki-laki", sistole: 120, diastole: 80, bb: 56, tb: 165,
+        actual: "J00 / J06.9"
+      },
+      {
+        id: "p2",
+        title_id: "Hipertensi Esensial (I10)",
+        title_en: "Essential Hypertension (I10)",
+        anamnesa: "kontrol ulang tensi tinggi, kepala belakang cekot-cekot, leher kaku, kadang terasa nggliyeng kalau bangun tidur",
+        age: 58, jkl: "Perempuan", sistole: 165, diastole: 95, bb: 64, tb: 155,
+        actual: "I10"
+      },
+      {
+        id: "p3",
+        title_id: "Kontrol ARV / VCT (Z21)",
+        title_en: "ARV / HIV Medication (Z21)",
+        anamnesa: "ambil obat ARV 1 bulan, kontrol rutin, tidak ada keluhan",
+        age: 29, jkl: "Laki-laki", sistole: 120, diastole: 80, bb: 62, tb: 168,
+        actual: "Z21"
+      },
+      {
+        id: "p4",
+        title_id: "Gastritis Akut / Maag (K29)",
+        title_en: "Acute Gastritis / Dyspepsia (K29)",
+        anamnesa: "perut perih di ulu hati sejak 2 hari, mual muntah bila makan, badan lemas, perut kembung dan begah",
+        age: 24, jkl: "Perempuan", sistole: 105, diastole: 70, bb: 48, tb: 156,
+        actual: "K29.7"
+      },
+      {
+        id: "p5",
+        title_id: "Nekrosis Pulpa Gigi (K04.1)",
+        title_en: "Dental Pulp Necrosis (K04.1)",
+        anamnesa: "px mengatakan sakit gigi berlubang cekot-cekot sejak 3 hari, buat ngunyah linu, gusi bengkak",
+        age: 35, jkl: "Laki-laki", sistole: 120, diastole: 80, bb: 65, tb: 165,
+        actual: "K04.1"
+      },
+      {
+        title_id: "Konjungtivitis (H10) [Langka: 0.58%]",
+        title_en: "Conjunctivitis (H10) [Rare Win: 0.58%]",
+        anamnesa: "mata kanan kiri merah perih, keluar kotoran belekan lengket saat bangun tidur, gatal dan silau",
+        age: 23, jkl: "Perempuan", sistole: 110, diastole: 70, bb: 52, tb: 156,
+        actual: "H10"
+      },
+      {
+        id: "p7",
+        title_id: "Demam Akut (R50) [Dilema Base-Rate]",
+        title_en: "Acute Fever (R50) [Base-Rate Dilemma]",
+        anamnesa: "demam tinggi 3 hari naik turun, badan gregesi lemas, pusing, mual tapi tidak batuk dan tidak pilek",
+        age: 22, jkl: "Perempuan", sistole: 110, diastole: 70, bb: 50, tb: 155,
+        actual: "R50 (Model Prediksi J00)",
+        is_error: true
+      },
+      {
+        id: "p8",
+        title_id: "Gondongan / Mumps (B26) [Penyakit Langka]",
+        title_en: "Mumps (B26) [Rare Disease Miss]",
+        anamnesa: "pipi bawah telinga kanan bengkak besar dan nyeri linu, demam 2 hari, susah buka mulut dan mengunyah",
+        age: 11, jkl: "Laki-laki", sistole: 105, diastole: 70, bb: 32, tb: 138,
+        actual: "B26 (Model Luput, Butuh Dokter)",
+        is_error: true
+      }
+    ];
+
+    const i18n = {
+      id: {
+        header_subtitle: "Sistem Pendukung Keputusan Medis Cepat: Non-Autoregressive SLM (100% Client-Side WebAssembly)",
+        vignettes_label: "Contoh Kasus:",
+        encounter_title: "Data Kunjungan Pasien",
+        encounter_tag: "Rekam Medis Primer",
+        anamnesa_label: "Keluhan Utama (Anamnesa)",
+        anamnesa_lang_hint: "Bahasa Indonesia / Jawa",
+        anamnesa_placeholder: "Contoh: batuk mulai tadi malam, dahak sedikit hijau, pilek 3 hari, badan gregesi, tenggorokan nyeri (+)",
+        vitals_header: "Tanda Vital & Demografi",
+        sistole_label: "Sistole (mmHg)",
+        diastole_label: "Diastole (mmHg)",
+        age_label: "Usia (Tahun)",
+        sex_label: "Jenis Kelamin",
+        female: "Perempuan",
+        male: "Laki-laki",
+        weight_label: "Berat Badan (kg)",
+        height_label: "Tinggi Badan (cm)",
+        run_diagnosis_btn: "Jalankan Diagnosis Banding",
+        comparison_header: "Rekomendasi Diagnosis Diferensial ICD-10 (Top-1, Top-2, Top-3)",
+        select_hint: "Klik kartu untuk memilih diagnosis",
+        top1_card_title: "Diagnosis Utama (Top-1)",
+        top1_card_sub: "Probabilitas Tertinggi Terkalibrasi",
+        top2_card_title: "Diferensial 2 (Top-2)",
+        top2_card_sub: "Opsi Banding Sekunder",
+        top3_card_title: "Diferensial 3 (Top-3)",
+        top3_card_sub: "Opsi Banding Tersier",
+        awaiting_analysis: "Menunggu Analisis",
+        awaiting_click: "Pilih contoh kasus atau klik 'Jalankan Diagnosis'.",
+        diff2_hint: "Pertimbangkan Jika Gejala Berbeda",
+        diff3_hint: "Jendela Diferensial (90.7%)",
+        rank_1_badge: "Pilihan Utama",
+        rank_2_badge: "Diferensial 2",
+        rank_3_badge: "Diferensial 3",
+        doctor_panel_title: "Keputusan Akhir Dokter (Human-in-the-Loop)",
+        doctor_panel_subtitle: "Konfirmasi diagnosis resmi untuk dicatat pada Rekam Medis Elektronik (RME)",
+        doctor_panel_badge: "Otoritas Klinis Penuh",
+        selected_code_label: "Kode Diagnosis Terpilih (ICD-10)",
+        selected_code_placeholder: "Pilih dari kartu di atas atau ketik kode",
+        notes_label: "Catatan Dokter (Opsional)",
+        notes_placeholder: "Contoh: Terkonfirmasi infeksi saluran napas akut",
+        confirm_verdict_btn: "Konfirmasi RME",
+        alert_recorded: "Keputusan diagnosis dokter berhasil dicatat!",
+        footer_text: "Puskesmas Poncol CDSS • Model ELECTRA-Small 13.5M INT8 ONNX (Zero-Server WebAssembly) • Semarang, Indonesia",
+        conf_high: "KEYAKINAN TINGGI (MANFASAT)",
+        conf_mod: "KEYAKINAN SEDANG (EVALUASI)",
+        conf_low: "KEYAKINAN RENDAH (REVIU DOKTER)"
+      },
+      en: {
+        header_subtitle: "Rapid Medical Decision Support: Non-Autoregressive SLM (100% Client-Side WebAssembly)",
+        vignettes_label: "Clinical Vignettes:",
+        encounter_title: "Patient Encounter Record",
+        encounter_tag: "Primary Care EHR",
+        anamnesa_label: "Chief Complaint (Anamnesis)",
+        anamnesa_lang_hint: "Mixed Indonesian / Javanese",
+        anamnesa_placeholder: "e.g. cough since last night, slightly green sputum, cold for 3 days, feverish chills, sore throat (+)",
+        vitals_header: "Vital Signs & Demographics",
+        sistole_label: "Systolic BP (mmHg)",
+        diastole_label: "Diastolic BP (mmHg)",
+        age_label: "Age (Years)",
+        sex_label: "Biological Sex",
+        female: "Female",
+        male: "Male",
+        weight_label: "Weight (kg)",
+        height_label: "Height (cm)",
+        run_diagnosis_btn: "Run Differential Triage",
+        comparison_header: "ICD-10 Recommendation Comparison (Top-1, Top-2, Top-3)",
+        select_hint: "Click any recommendation card to select code",
+        top1_card_title: "Primary Diagnosis (Top-1)",
+        top1_card_sub: "Highest Calibrated Probability",
+        top2_card_title: "Differential 2 (Top-2)",
+        top2_card_sub: "Secondary Clinical Option",
+        top3_card_title: "Differential 3 (Top-3)",
+        top3_card_sub: "Tertiary Clinical Option",
+        awaiting_analysis: "Awaiting Analysis",
+        awaiting_click: "Select a clinical vignette or click 'Run Differential Triage'.",
+        diff2_hint: "Consider If Presentation Diverges",
+        diff3_hint: "Differential Window (90.7%)",
+        rank_1_badge: "Primary Choice",
+        rank_2_badge: "Differential 2",
+        rank_3_badge: "Differential 3",
+        doctor_panel_title: "Attending Physician Final Judgment (Human-in-the-Loop)",
+        doctor_panel_subtitle: "Verify official diagnosis code to record in Electronic Health Record",
+        doctor_panel_badge: "Absolute Clinical Authority",
+        selected_code_label: "Selected Diagnosis Code (ICD-10)",
+        selected_code_placeholder: "Select from above cards or type code",
+        notes_label: "Physician Clinical Notes (Optional)",
+        notes_placeholder: "e.g. Confirmed acute upper respiratory infection",
+        confirm_verdict_btn: "Confirm Clinical Verdict",
+        alert_recorded: "Physician diagnostic verdict recorded successfully in EHR!",
+        footer_text: "Puskesmas Poncol CDSS • ELECTRA-Small 13.5M INT8 ONNX Model (Zero-Server WebAssembly) • Semarang, Indonesia",
+        conf_high: "HIGH CONFIDENCE (STRONG FIT)",
+        conf_mod: "MODERATE CONFIDENCE (EVALUATE)",
+        conf_low: "LOW CONFIDENCE (CLINICIAN REVIEW)"
+      }
+    };
+
+    // -------------------------------------------------------------------------
+    // Language Switcher
+    // -------------------------------------------------------------------------
+    function setLanguage(lang) {
+      currentLang = lang;
+      const dict = i18n[lang];
+
+      const btnId = document.getElementById('lang-btn-id');
+      const btnEn = document.getElementById('lang-btn-en');
+      if (lang === 'id') {
+        btnId.className = "px-2.5 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-teal-800";
+        btnEn.className = "px-2.5 py-1 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-800";
+      } else {
+        btnEn.className = "px-2.5 py-1 text-xs font-bold rounded-md transition shadow-sm bg-white text-teal-800";
+        btnId.className = "px-2.5 py-1 text-xs font-medium rounded-md transition text-slate-500 hover:text-slate-800";
+      }
+
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (dict[key]) el.innerText = dict[key];
+      });
+
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (dict[key]) el.setAttribute('placeholder', dict[key]);
+      });
+
+      renderPresets();
+      if (currentTop3.length > 0) {
+        renderTopCards(currentTop3);
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Engine Initialization
+    // -------------------------------------------------------------------------
+    async function initEngine() {
+      try {
+        ort.env.wasm.wasmPaths = './';
+        ort.env.wasm.numThreads = 1;
+        ort.env.wasm.simd = true;
+        ort.env.wasm.proxy = false;
+
+        const [vocabRes, criteriaRes] = await Promise.all([
+          fetch('models/electra/vocab.json'),
+          fetch('models/electra/criteria.json')
+        ]);
+        const vocab = await vocabRes.json();
+        criteria = await criteriaRes.json();
+        tokenizer = new WordPieceTokenizer(vocab);
+
+        ortSession = await ort.InferenceSession.create('models/electra/model_int8.onnx', {
+          executionProviders: ['wasm'],
+          graphOptimizationLevel: 'all'
+        });
+
+        document.getElementById('engine-dot').className = "w-2 h-2 rounded-full bg-emerald-500";
+        document.getElementById('engine-dot').classList.remove('animate-pulse');
+        document.getElementById('engine-status-text').innerText = "WASM Engine Siap";
+        document.getElementById('btn-submit').disabled = false;
+
+        renderPresets();
+        lucide.createIcons();
+      } catch (err) {
+        console.error('Failed to initialize engine:', err);
+        document.getElementById('engine-dot').className = "w-2 h-2 rounded-full bg-red-500";
+        document.getElementById('engine-status-text').innerText = "Gagal Memuat Model";
+      }
+    }
+
+    // -------------------------------------------------------------------------
+    // Vignettes / Presets Rendering
+    // -------------------------------------------------------------------------
+    function renderPresets() {
+      const container = document.getElementById('presets-container');
+      container.innerHTML = '';
+
+      PRESETS.forEach(p => {
+        const title = currentLang === 'en' ? p.title_en : p.title_id;
+        const anamnesa = p.anamnesa;
+
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        if (p.is_error) {
+          btn.className = "px-2.5 py-1 rounded-lg bg-amber-50 hover:bg-amber-100 text-amber-900 hover:border-amber-400 font-semibold border border-amber-200 shadow-sm transition shrink-0 flex items-center space-x-1.5 text-xs";
+          btn.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span><span>⚠️ ${title}</span>`;
+        } else {
+          btn.className = "px-2.5 py-1 rounded-lg bg-white hover:bg-teal-50 hover:text-teal-700 hover:border-teal-300 text-slate-700 font-medium border border-slate-200 shadow-sm transition shrink-0 flex items-center space-x-1.5 text-xs";
+          btn.innerHTML = `<span class="w-1.5 h-1.5 rounded-full bg-teal-500"></span><span>${title}</span>`;
+        }
+        btn.onclick = () => {
+          document.getElementById('anamnesa').value = anamnesa;
+          document.getElementById('sistole').value = p.sistole;
+          document.getElementById('diastole').value = p.diastole;
+          document.getElementById('age').value = p.age;
+          document.getElementById('jkl').value = p.jkl;
+          document.getElementById('bb').value = p.bb;
+          document.getElementById('tb').value = p.tb;
+
+          document.querySelectorAll('#presets-container button').forEach(b => b.classList.remove('ring-2', 'ring-teal-500'));
+          btn.classList.add('ring-2', 'ring-teal-500');
+
+          runInference();
+        };
+        container.appendChild(btn);
+      });
+    }
+
+    // -------------------------------------------------------------------------
+    // In-Browser Model Inference
+    // -------------------------------------------------------------------------
+    function encodePrompt(noteText, codeList) {
+      const maskId = tokenizer.maskId;
+      const clsId = tokenizer.clsId;
+      const sepId = tokenizer.sepId;
+
+      const question = "pertanyaan : manakah diagnosis icd - 10 utama yang dicatat dokter ?";
+      const headIds = tokenizer.tokenize(question);
+      const inputIds = [clsId, ...headIds, sepId];
+
+      const markerPositions = [];
+      for (const code of codeList) {
+        const desc = criteria[code] ? criteria[code].id : "";
+        markerPositions.push(inputIds.length);
+        const optIds = tokenizer.tokenize(`${code.toLowerCase()} : ${desc}`).slice(0, 6);
+        inputIds.push(maskId, ...optIds);
+      }
+      inputIds.push(sepId);
+
+      const room = Math.max(16, 512 - inputIds.length - 1);
+      const noteIds = tokenizer.tokenize(`catatan : ${noteText}`).slice(0, room);
+      inputIds.push(...noteIds, sepId);
+
+      return { inputIds, markerPositions, length: inputIds.length };
+    }
+
+    function softmax(arr, temp = 0.90) {
+      const scaled = arr.map(x => x / temp);
+      const maxVal = Math.max(...scaled);
+      const exps = scaled.map(x => Math.exp(x - maxVal));
+      const sum = exps.reduce((a, b) => a + b, 0);
+      return exps.map(x => x / Math.max(1e-12, sum));
+    }
+
+    async function runInference() {
+      if (!ortSession) return;
+
+      const anamnesa = document.getElementById('anamnesa').value.trim();
+      const sistole = parseFloat(document.getElementById('sistole').value) || 120;
+      const diastole = parseFloat(document.getElementById('diastole').value) || 80;
+      const age = parseFloat(document.getElementById('age').value) || 35;
+      const jkl = document.getElementById('jkl').value || "Laki-laki";
+      const bb = parseFloat(document.getElementById('bb').value) || 60;
+      const tb = parseFloat(document.getElementById('tb').value) || 165;
+
+      if (!anamnesa) return;
+
+      const btn = document.getElementById('btn-submit');
+      btn.disabled = true;
+      const oldHtml = btn.innerHTML;
+      btn.innerHTML = `<i data-lucide="loader-2" class="w-3.5 h-3.5 animate-spin mr-1.5"></i> ${currentLang === 'en' ? 'Analyzing...' : 'Menganalisis...'}`;
+      lucide.createIcons();
+
+      const tStart = performance.now();
+
+      // Assemble structured clinical encounter text exactly as expected by the model
+      const fullNote = `Pasien: jenis kelamin ${jkl}, usia ${age.toFixed(1)} tahun, berat badan ${bb.toFixed(1)} kg, tinggi badan ${tb.toFixed(1)} cm, tensi / tekanan darah ${Math.round(sistole)}/${Math.round(diastole)} mmHg.\nKeluhan utama (anamnesa): ${anamnesa}`;
+
+      const codeList = Object.keys(criteria);
+      const { inputIds, markerPositions, length } = encodePrompt(fullNote, codeList);
+
+      const inputIdsTensor = new ort.Tensor('int64', BigInt64Array.from(inputIds.map(BigInt)), [1, length]);
+      const attentionMaskTensor = new ort.Tensor('bool', new Uint8Array(length).fill(1), [1, length]);
+      const markerPosTensor = new ort.Tensor('int64', BigInt64Array.from(markerPositions.map(BigInt)), [1, codeList.length]);
+
+      try {
+        const results = await ortSession.run({
+          input_ids: inputIdsTensor,
+          attention_mask: attentionMaskTensor,
+          marker_pos: markerPosTensor
+        });
+
+        const logits = Array.from(results.logits.data);
+        const probs = softmax(logits, 0.90);
+        const latMs = performance.now() - tStart;
+
+        document.getElementById('header-latency').innerText = `${latMs.toFixed(1)} ms`;
+
+        const scored = codeList.map((code, idx) => ({
+          code,
+          prob: probs[idx],
+          desc_id: criteria[code].id,
+          desc_en: criteria[code].en
+        }));
+        scored.sort((a, b) => b.prob - a.prob);
+
+        currentTop3 = scored.slice(0, 3);
+        renderTopCards(currentTop3);
+
+        // Auto-fill physician verdict box with Top-1 code
+        document.getElementById('chosen-code').value = currentTop3[0].code;
+      } catch (err) {
+        console.error("Inference Error:", err);
+        alert("Error during inference: " + err.message);
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldHtml;
+        lucide.createIcons();
+      }
+    }
+
+    function renderTopCards(top3) {
+      const dict = i18n[currentLang];
+
+      top3.forEach((item, idx) => {
+        const rank = idx + 1;
+        const pct = (item.prob * 100).toFixed(1);
+        const desc = currentLang === 'en' ? item.desc_en : item.desc_id;
+
+        document.getElementById(`top${rank}-prob-badge`).innerText = `${pct}%`;
+
+        const contentEl = document.getElementById(`top${rank}-content`);
+        contentEl.innerHTML = `
+          <div class="p-3 rounded-xl bg-slate-50 border border-slate-100">
+            <div class="flex items-center justify-between mb-1">
+              <span class="font-mono font-bold text-sm text-slate-900 bg-white px-2 py-0.5 rounded border border-slate-200">
+                ${item.code}
+              </span>
+              <span class="font-mono text-xs font-bold text-slate-700">${pct}%</span>
+            </div>
+            <p class="text-xs text-slate-600 font-medium leading-relaxed mt-1">${desc}</p>
+            <div class="w-full bg-slate-200 h-1.5 rounded-full mt-2.5 overflow-hidden">
+              <div class="bg-teal-500 h-full rounded-full" style="width: ${pct}%"></div>
+            </div>
+          </div>
+        `;
+
+        const selectBtn = document.getElementById(`btn-select-top${rank}`);
+        if (selectBtn) selectBtn.classList.remove('hidden');
+
+        // Top-1 Triage Badge
+        if (rank === 1) {
+          const triageBox = document.getElementById('top1-triage-box');
+          const triageText = document.getElementById('top1-triage-text');
+          if (item.prob >= 0.60) {
+            triageBox.className = "my-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-center";
+            triageText.className = "text-[11px] font-bold text-emerald-800 flex items-center justify-center space-x-1";
+            triageText.innerHTML = `<i data-lucide="shield-check" class="w-3.5 h-3.5 inline mr-1 text-emerald-600"></i> ${dict.conf_high}`;
+          } else if (item.prob >= 0.35) {
+            triageBox.className = "my-3 p-2.5 rounded-xl bg-amber-50 border border-amber-200 text-center";
+            triageText.className = "text-[11px] font-bold text-amber-800 flex items-center justify-center space-x-1";
+            triageText.innerHTML = `<i data-lucide="alert-circle" class="w-3.5 h-3.5 inline mr-1 text-amber-600"></i> ${dict.conf_mod}`;
+          } else {
+            triageBox.className = "my-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-center";
+            triageText.className = "text-[11px] font-bold text-rose-800 flex items-center justify-center space-x-1";
+            triageText.innerHTML = `<i data-lucide="help-circle" class="w-3.5 h-3.5 inline mr-1 text-rose-600"></i> ${dict.conf_low}`;
+          }
+        }
+      });
+      lucide.createIcons();
+    }
+
+    function selectCardCode(rank) {
+      if (currentTop3[rank - 1]) {
+        document.getElementById('chosen-code').value = currentTop3[rank - 1].code;
+      }
+    }
+
+    function confirmVerdict() {
+      const code = document.getElementById('chosen-code').value.trim();
+      if (!code) {
+        alert("Pilih atau ketik kode diagnosis terlebih dahulu!");
+        return;
+      }
+      const alertBox = document.getElementById('alert-verdict-saved');
+      alertBox.classList.remove('hidden');
+      setTimeout(() => alertBox.classList.add('hidden'), 4000);
+    }
+
+    document.getElementById('encounter-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      runInference();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initEngine();
+    });
+  </script>
+</body>
+</html>
