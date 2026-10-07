@@ -1,4 +1,4 @@
-# Puskesmas Poncol Clinical Decision Support System (CDSS)
+# Puskesmas Clinical Decision Support System (CDSS)
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-teal.svg)](https://opensource.org/licenses/MIT)
 [![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-blue.svg)](https://www.python.org/)
@@ -10,19 +10,11 @@ Evaluates an ultra-compact **13.5M parameter bidirectional encoder (ELECTRA-Smal
 
 ---
 
-## 🚀 1-Click Static Demo (Zero-Server / WebAssembly)
+## 1-Click Static Demo (Zero-Server / WebAssembly)
 
 The web demonstration runs **100% client-side in the browser** using WebAssembly SIMD (`onnxruntime-web`) and a **13.2 MB quantized INT8 ONNX model**. Zero Flask or server-side Python required.
 
-```bash
-# 1. Clone repository
-git clone https://github.com/solie/pusk_cdss.git
-cd pusk_cdss
-
-# 2. Launch static server
-./demo/run_demo.sh
-```
-Open **`http://127.0.0.1:8085/`** in your browser.
+Open **[https://cdss.data-lab.xyz/](https://cdss.data-lab.xyz/)** in your browser.
 
 - **Dedicated Vitals & Demographics**: Systolic/diastolic blood pressure, age, sex, weight, height.
 - **Bilingual Interface**: Toggle between Bahasa Indonesia (`ID`) and English (`EN`).
@@ -33,7 +25,7 @@ Open **`http://127.0.0.1:8085/`** in your browser.
 
 ---
 
-## 📊 Benchmark Summary (Out-of-City Holdout, $n = 3,758$)
+## Benchmark Summary (Out-of-City Holdout, $n = 3,758$)
 
 Evaluation on 3,758 unseen encounters under severe demographic and epidemiological population distribution shift (`kdesa = XXX`):
 
@@ -51,26 +43,16 @@ Evaluation on 3,758 unseen encounters under severe demographic and epidemiologic
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```
 pusk_cdss/
 ├── data/
-│   └── poncol_dummy.csv          # Synthetic dataset (1,000 visits matching real schema)
-├── demo/
-│   ├── index.html                # Tailwind + Lucide client-side SPA
-│   ├── ort.min.js                # ONNX Runtime Web library
-│   ├── presets.json              # 8 clinical test cases
-│   ├── run_demo.sh               # 1-click launcher
-│   └── models/electra/
-│       ├── model_int8.onnx       # 13.2 MB quantized ELECTRA decision model
-│       ├── vocab.json            # WordPiece dictionary (30,622 tokens)
-│       └── criteria.json         # 29 ICD-10 diagnostic criteria descriptions
+│   └── pusk_dummy.csv          # Synthetic dataset (1,000 visits matching real schema)
 ├── figures/
-│   ├── figure1_patient_attrition.png   # Study flowchart & cohort partition
-│   └── figure2_empirical_panels.png    # 3-panel validation (Scaling, Calibration, Epochs)
+│   └── figure1_empirical_panels.png    # 3-panel validation (Scaling, Calibration, Epochs)
 ├── scripts/
-│   ├── poncol_data.py            # Data cleaning, feature extraction, ICD-10 label mapping
+│   ├── pusk_data.py              # Data cleaning, feature extraction, ICD-10 label mapping
 │   ├── electra_system1.py        # Vanilla PyTorch ELECTRA-Small training & evaluation
 │   ├── ablation_electra.py       # Clinical context & physiological feature ablation
 │   ├── export_electra_onnx.py    # ONNX export and dynamic INT8 quantization
@@ -85,7 +67,7 @@ pusk_cdss/
 
 ---
 
-## 🛠️ Python Environment Setup
+## Python Environment Setup
 
 ```bash
 python -m venv .venv
@@ -94,7 +76,7 @@ pip install -r requirements.txt
 ```
 
 ### 1. Generating Dummy Data
-To regenerate the synthetic clinical dataset matching the 16-column Puskesmas Poncol EHR schema:
+To regenerate the synthetic clinical dataset matching the 16-column Puskesmas EHR schema:
 ```bash
 python scripts/generate_dummy_data.py
 ```
@@ -118,15 +100,15 @@ python scripts/export_electra_onnx.py --model-dir runs/electra --out-dir models/
 
 ---
 
-## ⚖️ Data Protection & Privacy
+## Data Protection & Privacy
 
 Due to patient confidentiality safeguards and statutory regulations governing medical records under Indonesian health data protection laws (Law No. 27/2022 on Personal Data Protection), raw de-identified patient consultation records cannot be shared publicly.
 
-The provided `data/poncol_dummy.csv` is completely synthetic and generated using statistical sampling across the 29 target ICD-10 classes to enable full code execution and pipeline verification without compromising patient privacy.
+The provided `data/pusk_dummy.csv` is completely synthetic and generated using statistical sampling across the 29 target ICD-10 classes to enable full code execution and pipeline verification without compromising patient privacy.
 
 ---
 
-## 📖 Citation
+## Citation
 
 ```bibtex
 @article{poncol_cdss_2026,

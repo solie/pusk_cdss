@@ -1,26 +1,8 @@
-"""Shared data preparation for the Poncol ICD-10 comparison.
+"""Shared data preparation for the ICD-10 comparison.
 
 One definition of the dataset, the label set, the folds and the sample, so the
 TF-IDF + LinearSVC baseline and the Jeff zero-shot model are scored on exactly
 the same rows. Import it from the other scripts; do not fork the logic.
-
-What this fixes compared with Poncol-System-1.ipynb:
-
-1. Labels. `kode_penyakit` is a JSON array. The notebook took the first element,
-   and lower/upper case variants of one code counted as separate classes
-   ("j00" and "J00"). Here every code is upper-cased first, so one class is one
-   diagnosis.
-2. Coverage. The notebook kept codes while the running cumulative share stayed
-   at or below 75%, which stops one code short of the crossing and lands at
-   74.50%. Here the crossing code is included, so the target is actually met or
-   exceeded (documented in the report).
-3. Leakage between visits of one patient. 9,950 patients produce 26,110 visits
-   in the kept label set, and patients average 2.6 visits. A random row split
-   puts the same patient in train and test. Folds are built with
-   StratifiedGroupKFold and every fold holds out whole patients.
-4. Sampling. `--sample` keeps the run comparable: both models see the same
-   reduced dataset with the same folds, never one model on 5,181 rows and the
-   other on the first 500 validation rows.
 """
 
 from __future__ import annotations
@@ -201,7 +183,7 @@ def build_dataset(
     unlabelled = [code for code in labels if code not in ICD_LABELS]
     if unlabelled:
         raise ValueError(
-            f"No option text for {unlabelled}: add it to ICD_LABELS in poncol_data.py "
+            f"No option text for {unlabelled}: add it to ICD_LABELS in pusk_data.py "
             "(raise --coverage to keep fewer classes, or lower it to keep more)"
         )
 
@@ -249,17 +231,17 @@ def prompt_for_row(row: pd.Series, language: str = "en") -> str:
     )
 
 
-# 9 Official Kelurahan in Puskesmas Poncol Catchment Area (Kecamatan Semarang Tengah)
+# 9 Kelurahan in Puskesmas Catchment Area
 CATCHMENT_VILLAGES = {
-    "KD01": "Pandansari",
-    "KD02": "Bangunharjo",
-    "KD03": "Kauman",
-    "KD04": "Purwodinatan",
-    "KD05": "Pendrikan Lor",
-    "KD06": "Kranggan",
-    "KD07": "Kembangsari",
-    "KD08": "Pendrikan Kidul",
-    "KD09": "Sekayu",
+    "KD01": "Kelurahan 1",
+    "KD02": "Kelurahan 2",
+    "KD03": "Kelurahan 3",
+    "KD04": "Kelurahan 4",
+    "KD05": "Kelurahan 5",
+    "KD06": "Kelurahan 6",
+    "KD07": "Kelurahan 7",
+    "KD08": "Kelurahan 8",
+    "KD09": "Kelurahan 9",
 }
 
 # Short option text per ICD-10 code in English (standard WHO/ICD-10)

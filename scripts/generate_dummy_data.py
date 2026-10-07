@@ -1,4 +1,4 @@
-"""Generate realistic synthetic clinical dataset mimicking Puskesmas Poncol characteristics.
+"""Generate realistic synthetic clinical dataset mimicking Puskesmas characteristics.
 
 Maintains:
 - Identical 16-column EHR schema.
@@ -200,7 +200,7 @@ def generate_records(num_rows: int = 1000) -> pd.DataFrame:
     base_date = datetime(2024, 1, 2)
     classes = list(CLINICAL_TEMPLATES.keys())
     
-    # Probabilities matching Poncol distribution
+    # Probabilities matching Puskesmas distribution
     weights = [
         0.18, 0.14, 0.05, 0.15, 0.08, 0.06, 0.03, 0.03, 0.04, 0.02,
         0.03, 0.01, 0.04, 0.02, 0.02, 0.02, 0.01, 0.01, 0.01, 0.01,
@@ -274,6 +274,6 @@ if __name__ == "__main__":
     out_dir = Path("data")
     out_dir.mkdir(parents=True, exist_ok=True)
     df = generate_records(1000)
-    out_file = out_dir / "dummy_poncol.csv"
+    out_file = out_dir / "dummy_pusk.csv"
     df.to_csv(out_file, index=False)
     print(f"Generated {len(df)} synthetic patient encounters to {out_file}")

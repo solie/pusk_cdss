@@ -22,7 +22,7 @@ from transformers import AutoTokenizer
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from electra_system1 import ElectraSystem1, encode_encounter
-from poncol_data import get_icd_labels
+from pusk_data import get_icd_labels
 
 
 def main():

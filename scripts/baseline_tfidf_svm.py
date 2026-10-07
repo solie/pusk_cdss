@@ -25,7 +25,7 @@ from sklearn.preprocessing import OneHotEncoder, StandardScaler
 from sklearn.svm import LinearSVC
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from poncol_data import CATEGORICAL_FIELDS, NUMERIC_FIELDS, RANDOM_STATE, TEXT_FIELD, build_dataset  # noqa: E402
+from pusk_data import CATEGORICAL_FIELDS, NUMERIC_FIELDS, RANDOM_STATE, TEXT_FIELD, build_dataset  # noqa: E402
 
 
 def decision_scores(pipeline: Pipeline, X: pd.DataFrame, classes: np.ndarray) -> np.ndarray:
@@ -38,7 +38,7 @@ def decision_scores(pipeline: Pipeline, X: pd.DataFrame, classes: np.ndarray) ->
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--csv", default="poncol.csv")
+    parser.add_argument("--csv", default="data/dummy_pusk.csv")
     parser.add_argument("--out", default="runs/baseline")
     parser.add_argument("--splits", type=int, default=5)
     parser.add_argument("--coverage", type=float, default=0.75)
