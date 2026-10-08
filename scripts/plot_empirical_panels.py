@@ -49,14 +49,16 @@ k_vals = [1, 2, 3]
 m_electra = [67.78, 84.25, 90.69]
 m_svm = [65.38, 80.02, 87.39]
 m_modern = [63.07, 78.79, 86.67]
-m_gemma = [49.77, 72.12, 81.97]
+m_gemma_holdout = [1.60, 3.27, 5.32]
+m_gemma_dev = [49.77, 72.12, 81.97]
 m_zero = [1.09, 2.45, 32.65]
 
 ax_a.plot(k_vals, m_electra, marker="o", lw=2.2, color=c_electra, label="ELECTRA-Small (13.5M)", zorder=4)
 ax_a.plot(k_vals, m_svm, marker="s", lw=1.8, color=c_svm, linestyle="--", label="TF-IDF + Linear SVM", zorder=3)
 ax_a.plot(k_vals, m_modern, marker="^", lw=1.8, color=c_modern, label="ModernBERT (149M)", zorder=3)
-ax_a.plot(k_vals, m_gemma, marker="d", lw=1.5, color=c_gemma, linestyle=":", label="Gemma 3 270M (Ext)", zorder=2)
-ax_a.plot(k_vals, m_zero, marker="x", lw=1.2, color=c_zero, linestyle="-.", label="TinyDecide Zero-Shot", zorder=1)
+ax_a.plot(k_vals, m_gemma_dev, marker="d", lw=1.2, color=c_gemma, linestyle=":", label="Gemma 3 Ext (In-Dist Dev)", zorder=2)
+ax_a.plot(k_vals, m_gemma_holdout, marker="v", lw=1.2, color="#ea580c", linestyle="--", label="Gemma 3 Ext (Holdout)", zorder=2)
+ax_a.plot(k_vals, m_zero, marker="x", lw=1.0, color=c_zero, linestyle="-.", label="TinyDecide Zero-Shot", zorder=1)
 
 ax_a.axhline(90.0, color="#ef4444", linestyle="--", lw=1.0, alpha=0.8)
 ax_a.text(1.05, 90.5, "90% Clinical Triage Threshold", color="#b91c1c", fontsize=7.5, fontweight="bold")
